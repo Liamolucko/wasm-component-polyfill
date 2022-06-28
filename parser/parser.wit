@@ -1,0 +1,110 @@
+// TODO: incremental parsing
+
+/// Parses the passed bytes into a WebAssembly component, or returns `none` if the input is a module.
+parse: func(data: list<u8>) -> option<expected<output, error>>
+
+/// An error returned from the parser.
+record error {
+    /// The error's message.
+    message: string,
+    /// The offset in the wasm binary where the error occurred.
+    // Note: this is wasm, so a usize is 32 bits.
+    offset: u32,
+}
+
+/// The result of parsing.
+record output {
+    /// The types used by the component.
+    types: list<valtype>,
+    /// All of the component's imports.
+    imports: list<import>,
+    /// All of the component's exports.
+    exports: list<export>,
+}
+
+/// The type of a value.
+variant valtype {
+    /// The type at the contained index.
+    idx(u32),
+    /// The unit type.
+    %unit,
+    /// A boolean.
+    %bool,
+    /// An 8-bit signed integer.
+    %s8,
+    /// An 8-bit unsigned integer.
+    %u8,
+    /// A 16-bit signed integer.
+    %s16,
+    /// A 16-bit unsigned integer.
+    %u16,
+    /// A 32-bit signed integer.
+    %s32,
+    /// A 32-bit unsigned integer.
+    %u32,
+    /// A 64-bit signed integer.
+    %s64,
+    /// A 64-bit unsigned integer.
+    %u64,
+    /// A 32-bit floating point number.
+    %float32,
+    /// A 64-bit floating point number.
+    %float64,
+    /// A Unicode character (more specifically, a Unicode Scalar Value).
+    %char,
+    /// A string.
+    %string,
+}
+
+/// A component import.
+record import {
+    /// The name of the import.
+    name: string,
+    /// The description of the thing to be imported.
+    ///
+    /// Basically the import's type, except that functions, modules etc.
+    /// are allowed as well as values.
+    desc: externdesc,
+}
+
+/// A component export.
+record export {
+    /// The name of the export.
+    name: string,
+    /// The sort of thing being exported (value, function, etc.)
+    sort: sort,
+    /// The index of the thing being exported.
+    idx: u32,
+}
+
+/// A description of a thing to be imported.
+variant externdesc {
+    // core-module,
+    /// A function whose type has the contained index.
+    %func(u32),
+    // value,
+    // type,
+    // instance,
+    // component,
+}
+
+/// A sort of thing to be exported.
+variant sort {
+    // core(core-sort),
+    /// A function.
+    %func,
+    // value,
+    // type,
+    // component,
+    // instance,
+}
+
+// enum core-sort {
+//     %func,
+//     table,
+//     memory,
+//     global,
+//     %type,
+//     module,
+//     instance,
+// }
