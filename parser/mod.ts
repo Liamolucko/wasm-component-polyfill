@@ -9,8 +9,6 @@ await parser.instantiate(base64.decode(wasm));
 export function parse(data: Uint8Array) {
   const result = parser.parse(data);
   switch (result?.tag) {
-    case undefined:
-      return;
     case "ok":
       return result.val;
     case "err":

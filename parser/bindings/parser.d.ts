@@ -13,132 +13,158 @@ export interface Error {
   offset: number,
 }
 /**
-* The result of parsing.
+* A WebAssembly component.
 */
-export interface Output {
+export interface Component {
   /**
-  * The types used by the component.
+  * The core modules in the component.
   */
-  types: Valtype[],
+  modules: Module[],
   /**
-  * All of the component's imports.
+  * The core instances in the component.
   */
-  imports: Import[],
+  coreInstances: CoreInstance[],
   /**
-  * All of the component's exports.
+  * All of the core functions that we've aliased.
+  */
+  coreFuncs: CoreExport[],
+  /**
+  * All of the core tables that we've aliased.
+  */
+  coreTables: CoreExport[],
+  /**
+  * All of the core memories that we've aliased.
+  */
+  coreMemories: CoreExport[],
+  /**
+  * All of the core gloabls that we've aliased.
+  */
+  coreGlobals: CoreExport[],
+  /**
+  * The exports of the component.
   */
   exports: Export[],
 }
 /**
-* The type of a value.
+* A module in a component.
 */
-export type Valtype = ValtypeIdx | ValtypeUnit | ValtypeBool | ValtypeS8 | ValtypeU8 | ValtypeS16 | ValtypeU16 | ValtypeS32 | ValtypeU32 | ValtypeS64 | ValtypeU64 | ValtypeFloat32 | ValtypeFloat64 | ValtypeChar | ValtypeString;
+export type Module = ModuleImported | ModuleInline;
 /**
-* The type at the contained index.
+* An imported module, imported with the contained name.
 */
-export interface ValtypeIdx {
-  tag: "idx",
-  val: number,
+export interface ModuleImported {
+  tag: "imported",
+  val: string,
 }
 /**
-* The unit type.
+* An inline module, consisting of the contained raw bytes.
 */
-export interface ValtypeUnit {
-  tag: "unit",
+export interface ModuleInline {
+  tag: "inline",
+  val: Uint8Array,
 }
 /**
-* A boolean.
+* A core instance.
+* 
+* This can either be an actual instantiation of a core module, or just a
+* grouping of core functions that make up the 'exports' of the module.
 */
-export interface ValtypeBool {
-  tag: "bool",
+export type CoreInstance = CoreInstanceModule | CoreInstanceReexporter;
+/**
+* An instance created by instantiating a module.
+*/
+export interface CoreInstanceModule {
+  tag: "module",
+  val: ModuleInstance,
 }
 /**
-* An 8-bit signed integer.
+* An 'instance' which just reexports things from other instances.
 */
-export interface ValtypeS8 {
-  tag: "s8",
+export interface CoreInstanceReexporter {
+  tag: "reexporter",
+  val: CoreReexport[],
 }
 /**
-* An 8-bit unsigned integer.
+* A core instance created by instantiating a module with a set of imports.
 */
-export interface ValtypeU8 {
-  tag: "u8",
-}
-/**
-* A 16-bit signed integer.
-*/
-export interface ValtypeS16 {
-  tag: "s16",
-}
-/**
-* A 16-bit unsigned integer.
-*/
-export interface ValtypeU16 {
-  tag: "u16",
-}
-/**
-* A 32-bit signed integer.
-*/
-export interface ValtypeS32 {
-  tag: "s32",
-}
-/**
-* A 32-bit unsigned integer.
-*/
-export interface ValtypeU32 {
-  tag: "u32",
-}
-/**
-* A 64-bit signed integer.
-*/
-export interface ValtypeS64 {
-  tag: "s64",
-}
-/**
-* A 64-bit unsigned integer.
-*/
-export interface ValtypeU64 {
-  tag: "u64",
-}
-/**
-* A 32-bit floating point number.
-*/
-export interface ValtypeFloat32 {
-  tag: "float32",
-}
-/**
-* A 64-bit floating point number.
-*/
-export interface ValtypeFloat64 {
-  tag: "float64",
-}
-/**
-* A Unicode character (more specifically, a Unicode Scalar Value).
-*/
-export interface ValtypeChar {
-  tag: "char",
-}
-/**
-* A string.
-*/
-export interface ValtypeString {
-  tag: "string",
-}
-/**
-* A component import.
-*/
-export interface Import {
+export interface ModuleInstance {
   /**
-  * The name of the import.
+  * The index of the module to be instantiated.
+  */
+  module: number,
+  /**
+  * The arguments to instantiate the module with.
+  */
+  args: CoreInstantiateArg[],
+}
+/**
+* An argument when instantiating a core module.
+* 
+* Each argument defines the instance which is referenced when writing
+* `(import <name> "...")`.
+*/
+export interface CoreInstantiateArg {
+  /**
+  * The namespace being provided.
   */
   name: string,
   /**
-  * The description of the thing to be imported.
-  * 
-  * Basically the import's type, except that functions, modules etc.
-  * are allowed as well as values.
+  * The index of the instance which provides this namespace.
   */
-  desc: Externdesc,
+  instance: number,
+}
+/**
+* A core export defined as part of a reexporting core instance.
+*/
+export interface CoreReexport {
+  /**
+  * The name of the export.
+  */
+  name: string,
+  /**
+  * What sort of export it is.
+  */
+  sort: CoreSort,
+  /**
+  * The index of the thing to be exported in the index space of the sort
+  * that it is.
+  */
+  index: number,
+}
+/**
+* A sort of thing that a core export/import can be.
+* 
+* # Variants
+* 
+* ## `"func"`
+* 
+* A function.
+* 
+* ## `"table"`
+* 
+* A table.
+* 
+* ## `"memory"`
+* 
+* A memory.
+* 
+* ## `"global"`
+* 
+* A global.
+*/
+export type CoreSort = "func" | "table" | "memory" | "global";
+/**
+* An export of a core instance.
+*/
+export interface CoreExport {
+  /**
+  * The index of the instance it's an export of.
+  */
+  instance: number,
+  /**
+  * The name of the export.
+  */
+  name: string,
 }
 /**
 * A component export.
@@ -153,31 +179,20 @@ export interface Export {
   */
   sort: Sort,
   /**
-  * The index of the thing being exported.
+  * The index of the thing being exported in the index space of its sort.
   */
-  idx: number,
-}
-/**
-* A description of a thing to be imported.
-*/
-export type Externdesc = ExterndescFunc;
-/**
-* A function whose type has the contained index.
-*/
-export interface ExterndescFunc {
-  tag: "func",
-  val: number,
+  index: number,
 }
 /**
 * A sort of thing to be exported.
+* 
+* # Variants
+* 
+* ## `"module"`
+* 
+* A core module.
 */
-export type Sort = SortFunc;
-/**
-* A function.
-*/
-export interface SortFunc {
-  tag: "func",
-}
+export type Sort = "module";
 export class Parser {
   
   /**
@@ -248,5 +263,5 @@ export class Parser {
   /**
   * Parses the passed bytes into a WebAssembly component, or returns `none` if the input is a module.
   */
-  parse(data: Uint8Array): Result<Output, Error> | null;
+  parse(data: Uint8Array): Result<Component | null, Error>;
 }

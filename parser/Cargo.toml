@@ -1,0 +1,15 @@
+[package]
+name = "wasm-component-parser"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+wasmparser = "0.87.0"
+
+[dependencies.wit-bindgen-rust]
+git = "https://github.com/bytecodealliance/wit-bindgen"
+rev = "32cd6dafab634b9233bfd394579b64a38ac30b04"

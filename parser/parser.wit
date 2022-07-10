@@ -1,7 +1,7 @@
 // TODO: incremental parsing
 
 /// Parses the passed bytes into a WebAssembly component, or returns `none` if the input is a module.
-parse: func(data: list<u8>) -> option<expected<output, error>>
+parse: func(data: list<u8>) -> expected<option<component>, error>
 
 /// An error returned from the parser.
 record error {
@@ -12,59 +12,96 @@ record error {
     offset: u32,
 }
 
-/// The result of parsing.
-record output {
-    /// The types used by the component.
-    types: list<valtype>,
-    /// All of the component's imports.
-    imports: list<import>,
-    /// All of the component's exports.
+/// A WebAssembly component.
+record component {
+    /// The core modules in the component.
+    modules: list<module>,
+    /// The core instances in the component.
+    core-instances: list<core-instance>,
+    /// All of the core functions that we've aliased.
+    core-funcs: list<core-export>,
+    /// All of the core tables that we've aliased.
+    core-tables: list<core-export>,
+    /// All of the core memories that we've aliased.
+    core-memories: list<core-export>,
+    /// All of the core gloabls that we've aliased.
+    core-globals: list<core-export>,
+    /// The exports of the component.
     exports: list<export>,
 }
 
-/// The type of a value.
-variant valtype {
-    /// The type at the contained index.
-    idx(u32),
-    /// The unit type.
-    %unit,
-    /// A boolean.
-    %bool,
-    /// An 8-bit signed integer.
-    %s8,
-    /// An 8-bit unsigned integer.
-    %u8,
-    /// A 16-bit signed integer.
-    %s16,
-    /// A 16-bit unsigned integer.
-    %u16,
-    /// A 32-bit signed integer.
-    %s32,
-    /// A 32-bit unsigned integer.
-    %u32,
-    /// A 64-bit signed integer.
-    %s64,
-    /// A 64-bit unsigned integer.
-    %u64,
-    /// A 32-bit floating point number.
-    %float32,
-    /// A 64-bit floating point number.
-    %float64,
-    /// A Unicode character (more specifically, a Unicode Scalar Value).
-    %char,
-    /// A string.
-    %string,
+/// A module in a component.
+variant module {
+    /// An imported module, imported with the contained name.
+    imported(string),
+    /// An inline module, consisting of the contained raw bytes.
+    inline(list<u8>),
 }
 
-/// A component import.
-record import {
-    /// The name of the import.
+/// A core instance.
+///
+/// This can either be an actual instantiation of a core module, or just a
+/// grouping of core functions that make up the 'exports' of the module.
+variant core-instance {
+    /// An instance created by instantiating a module.
+    module(module-instance),
+    /// An 'instance' which just reexports things from other instances.
+    reexporter(list<core-reexport>),
+}
+
+/// A core instance created by instantiating a module with a set of imports.
+record module-instance {
+    /// The index of the module to be instantiated.
+    module: u32,
+    /// The arguments to instantiate the module with.
+    args: list<core-instantiate-arg>,
+}
+
+/// An argument when instantiating a core module.
+///
+/// Each argument defines the instance which is referenced when writing
+/// `(import <name> "...")`.
+record core-instantiate-arg {
+    /// The namespace being provided.
     name: string,
-    /// The description of the thing to be imported.
-    ///
-    /// Basically the import's type, except that functions, modules etc.
-    /// are allowed as well as values.
-    desc: externdesc,
+    /// The index of the instance which provides this namespace.
+    instance: u32,
+}
+
+/// A core export defined as part of a reexporting core instance.
+record core-reexport {
+    /// The name of the export.
+    name: string,
+    /// What sort of export it is.
+    sort: core-sort,
+    /// The index of the thing to be exported in the index space of the sort
+    /// that it is.
+    index: u32,
+}
+
+/// A sort of thing that a core export/import can be.
+enum core-sort {
+    /// A function.
+    %func,
+    /// A table.
+    table,
+    /// A memory.
+    memory,
+    /// A global.
+    global,
+    // These three aren't allowed yet, but the spec defines them in case the
+    // type imports proposal and module linking proposal become a thing.
+    // %type,
+    // module,
+    // instance,
+}
+
+/// An export of a core instance.
+record core-export {
+    /// The index of the instance it's an export of.
+    instance: u32,
+    /// The name of the export.
+    name: string,
 }
 
 /// A component export.
@@ -73,38 +110,19 @@ record export {
     name: string,
     /// The sort of thing being exported (value, function, etc.)
     sort: sort,
-    /// The index of the thing being exported.
-    idx: u32,
-}
-
-/// A description of a thing to be imported.
-variant externdesc {
-    // core-module,
-    /// A function whose type has the contained index.
-    %func(u32),
-    // value,
-    // type,
-    // instance,
-    // component,
+    /// The index of the thing being exported in the index space of its sort.
+    index: u32,
 }
 
 /// A sort of thing to be exported.
-variant sort {
-    // core(core-sort),
+enum sort {
+    /// A core module.
+    module,
     /// A function.
-    %func,
+    // %func,
     // value,
     // type,
     // component,
     // instance,
 }
 
-// enum core-sort {
-//     %func,
-//     table,
-//     memory,
-//     global,
-//     %type,
-//     module,
-//     instance,
-// }
