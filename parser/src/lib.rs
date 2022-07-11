@@ -6,6 +6,7 @@ use parser::{
 };
 use wasmparser::{
     Alias, BinaryReaderError, ComponentExternalKind, Encoding, ExternalKind, Instance, Payload,
+    WasmFeatures,
 };
 
 impl From<BinaryReaderError> for Error {
@@ -93,10 +94,17 @@ impl parser::Parser for Parser {
         };
 
         let parser = wasmparser::Parser::new(0);
-        let mut validator = wasmparser::Validator::new();
+        let mut validator = wasmparser::Validator::new_with_features(WasmFeatures {
+            component_model: true,
+            ..Default::default()
+        });
 
-        for payload in parser.parse_all(&data) {
-            let payload = payload?;
+        let mut payloads = parser.parse_all(&data);
+        loop {
+            // Note: this only returns `None` after `Payload::End`, and we
+            // break out of the loop when we receive that, so that should never
+            // happen.
+            let payload = payloads.next().unwrap()?;
 
             // Validate the payload.
             validator.payload(&payload)?;
@@ -115,52 +123,86 @@ impl parser::Parser for Parser {
 
                 Payload::ModuleSection { range, .. } => {
                     // TODO: double-check that index spaces are just ordered by where things show up in the binary.
-                    output.modules.push(Module::Inline(data[range].to_owned()))
-                }
-                Payload::InstanceSection(mut reader) => {
-                    output.core_instances.push(reader.read()?.into())
-                }
-                Payload::AliasSection(mut reader) => match reader.read()? {
-                    Alias::InstanceExport {
-                        kind,
-                        instance_index,
-                        name,
-                    } => {
-                        let export = CoreExport {
-                            instance: instance_index,
-                            name: name.to_owned(),
-                        };
-                        match kind {
-                            ExternalKind::Func => output.core_funcs.push(export),
-                            ExternalKind::Table => output.tables.push(export),
-                            ExternalKind::Memory => output.memories.push(export),
-                            ExternalKind::Global => output.globals.push(export),
-                            // I think this is something to do with exception handling.
-                            ExternalKind::Tag => todo!(),
+                    output.modules.push(Module::Inline(data[range].to_owned()));
+
+                    // Skip over this module.
+                    loop {
+                        let payload = payloads.next().unwrap()?;
+
+                        // We also need to validate modules; the validator
+                        // seems to break otherwise.
+                        // As well as that, we want to validate that modules
+                        // are properly used (e.g. instantiated with correct
+                        // imports, exports are used in places where that type
+                        // is correct, etc.)
+                        validator.payload(&payload)?;
+
+                        // Note: the code section of modules doesn't get parsed
+                        // unless you do so explicitly, so we aren't wasting
+                        // any time on validating that.
+
+                        if matches!(payload, Payload::End(_)) {
+                            // The module is finished, back to parsing the outer component.
+                            break;
                         }
                     }
-                    Alias::Outer { .. } => todo!("nested components"),
-                },
+                }
+                Payload::InstanceSection(mut reader) => {
+                    for _ in 0..reader.get_count() {
+                        output.core_instances.push(reader.read()?.into())
+                    }
+                }
+                Payload::AliasSection(mut reader) => {
+                    for _ in 0..reader.get_count() {
+                        match reader.read()? {
+                            Alias::InstanceExport {
+                                kind,
+                                instance_index,
+                                name,
+                            } => {
+                                let export = CoreExport {
+                                    instance: instance_index,
+                                    name: name.to_owned(),
+                                };
+                                match kind {
+                                    ExternalKind::Func => output.core_funcs.push(export),
+                                    ExternalKind::Table => output.tables.push(export),
+                                    ExternalKind::Memory => output.memories.push(export),
+                                    ExternalKind::Global => output.globals.push(export),
+                                    // I think this is something to do with exception handling.
+                                    ExternalKind::Tag => todo!(),
+                                }
+                            }
+                            Alias::Outer { .. } => todo!("nested components"),
+                        }
+                    }
+                }
                 Payload::ComponentSection { .. } => todo!("nested components"),
                 Payload::ComponentInstanceSection(_) => todo!("nested components"),
                 Payload::ComponentAliasSection(_) => todo!("component alias sections"),
                 Payload::ComponentCanonicalSection(_) => todo!("component canonical sections"),
                 Payload::ComponentStartSection(_) => todo!("component start sections"),
                 Payload::ComponentImportSection(mut reader) => {
-                    let import = reader.read()?;
-                    match import.ty {
-                        wasmparser::ComponentTypeRef::Module(_) => output
-                            .modules
-                            .push(Module::Imported(import.name.to_owned())),
-                        wasmparser::ComponentTypeRef::Func(_) => todo!("function imports"),
-                        wasmparser::ComponentTypeRef::Value(_) => todo!("value imports"),
-                        wasmparser::ComponentTypeRef::Type(_, _) => todo!("type imports"),
-                        wasmparser::ComponentTypeRef::Instance(_) => todo!("instance imports"),
-                        wasmparser::ComponentTypeRef::Component(_) => todo!("component imports"),
+                    for _ in 0..reader.get_count() {
+                        let import = reader.read()?;
+                        match import.ty {
+                            wasmparser::ComponentTypeRef::Module(_) => output
+                                .modules
+                                .push(Module::Imported(import.name.to_owned())),
+                            wasmparser::ComponentTypeRef::Func(_) => todo!("function imports"),
+                            wasmparser::ComponentTypeRef::Value(_) => todo!("value imports"),
+                            wasmparser::ComponentTypeRef::Type(_, _) => todo!("type imports"),
+                            wasmparser::ComponentTypeRef::Instance(_) => todo!("instance imports"),
+                            wasmparser::ComponentTypeRef::Component(_) => {
+                                todo!("component imports")
+                            }
+                        }
                     }
                 }
                 Payload::ComponentExportSection(mut reader) => {
-                    output.exports.push(reader.read()?.into())
+                    for _ in 0..reader.get_count() {
+                        output.exports.push(reader.read()?.into())
+                    }
                 }
 
                 Payload::End(_) => break,
