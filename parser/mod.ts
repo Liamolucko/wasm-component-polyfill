@@ -12,7 +12,7 @@ export function parse(data: Uint8Array) {
     case "ok":
       return result.val;
     case "err":
-      throw new Error(
+      throw new WebAssembly.CompileError(
         `${result.val.message} (at offset 0x${result.val.offset.toString(16)})`,
       );
   }
