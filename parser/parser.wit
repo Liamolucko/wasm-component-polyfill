@@ -21,11 +21,11 @@ record component {
     /// All of the core functions that we've aliased.
     core-funcs: list<core-export>,
     /// All of the core tables that we've aliased.
-    core-tables: list<core-export>,
+    tables: list<core-export>,
     /// All of the core memories that we've aliased.
-    core-memories: list<core-export>,
+    memories: list<core-export>,
     /// All of the core gloabls that we've aliased.
-    core-globals: list<core-export>,
+    globals: list<core-export>,
     /// The exports of the component.
     exports: list<export>,
 }
@@ -126,3 +126,61 @@ enum sort {
     // instance,
 }
 
+// We're not using this stuff right now but we might need it later.
+
+/// A component import.
+// record import {
+//     /// The name of the import.
+//     name: string,
+//     /// The description of the thing to be imported.
+//     ///
+//     /// Basically the import's type, except that functions, modules etc. are
+//     /// allowed as well as values.
+//     desc: importdesc,
+// }
+
+/// A description of a thing to be imported.
+// variant importdesc {
+//     /// A core module, whose type has the contained index.
+//     core-module(u32),
+//     // /// A function whose type has the contained index.
+//     // %func(u32),
+//     // value,
+//     // type,
+//     // instance,
+//     // component,
+// }
+
+/// The type of a value.
+// variant valtype {
+//     /// The type at the contained index.
+//     idx(u32),
+//     /// The unit type.
+//     %unit,
+//     /// A boolean.
+//     %bool,
+//     /// An 8-bit signed integer.
+//     %s8,
+//     /// An 8-bit unsigned integer.
+//     %u8,
+//     /// A 16-bit signed integer.
+//     %s16,
+//     /// A 16-bit unsigned integer.
+//     %u16,
+//     /// A 32-bit signed integer.
+//     %s32,
+//     /// A 32-bit unsigned integer.
+//     %u32,
+//     /// A 64-bit signed integer.
+//     %s64,
+//     /// A 64-bit unsigned integer.
+//     %u64,
+//     /// A 32-bit floating point number.
+//     %float32,
+//     /// A 64-bit floating point number.
+//     %float64,
+//     /// A Unicode character (more specifically, a Unicode Scalar Value).
+//     %char,
+//     /// A string.
+//     %string,
+// }

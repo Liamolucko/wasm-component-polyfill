@@ -251,9 +251,9 @@ export class Parser {
               modules: result4,
               coreInstances: result11,
               coreFuncs: result13,
-              coreTables: result15,
-              coreMemories: result17,
-              coreGlobals: result19,
+              tables: result15,
+              memories: result17,
+              globals: result19,
               exports: result22,
             };
             break;

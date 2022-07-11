@@ -1,5 +1,17 @@
 // @deno-types="./bindings/parser.d.ts"
 import { Parser } from "./bindings/parser.js";
+export type {
+  Component,
+  CoreExport,
+  CoreInstance,
+  CoreInstantiateArg,
+  CoreReexport,
+  CoreSort,
+  Export,
+  Module,
+  ModuleInstance,
+  Sort,
+} from "./bindings/parser.d.ts";
 import wasm from "./wasm.ts";
 import * as base64 from "https://deno.land/std@0.145.0/encoding/base64.ts";
 

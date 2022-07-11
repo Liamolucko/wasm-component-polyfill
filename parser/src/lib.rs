@@ -86,9 +86,9 @@ impl parser::Parser for Parser {
             modules: vec![],
             core_instances: vec![],
             core_funcs: vec![],
-            core_tables: vec![],
-            core_memories: vec![],
-            core_globals: vec![],
+            tables: vec![],
+            memories: vec![],
+            globals: vec![],
             exports: vec![],
         };
 
@@ -132,9 +132,9 @@ impl parser::Parser for Parser {
                         };
                         match kind {
                             ExternalKind::Func => output.core_funcs.push(export),
-                            ExternalKind::Table => output.core_tables.push(export),
-                            ExternalKind::Memory => output.core_memories.push(export),
-                            ExternalKind::Global => output.core_globals.push(export),
+                            ExternalKind::Table => output.tables.push(export),
+                            ExternalKind::Memory => output.memories.push(export),
+                            ExternalKind::Global => output.globals.push(export),
                             // I think this is something to do with exception handling.
                             ExternalKind::Tag => todo!(),
                         }

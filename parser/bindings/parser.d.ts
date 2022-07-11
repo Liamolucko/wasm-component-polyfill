@@ -31,15 +31,15 @@ export interface Component {
   /**
   * All of the core tables that we've aliased.
   */
-  coreTables: CoreExport[],
+  tables: CoreExport[],
   /**
   * All of the core memories that we've aliased.
   */
-  coreMemories: CoreExport[],
+  memories: CoreExport[],
   /**
   * All of the core gloabls that we've aliased.
   */
-  coreGlobals: CoreExport[],
+  globals: CoreExport[],
   /**
   * The exports of the component.
   */
