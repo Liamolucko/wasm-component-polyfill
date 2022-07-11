@@ -13,6 +13,7 @@ export function parse(data: Uint8Array) {
       return result.val;
     case "err":
       throw new WebAssembly.CompileError(
+        // @ts-ignore the type declarations for this constructor are outdated
         `${result.val.message} (at offset 0x${result.val.offset.toString(16)})`,
       );
   }
