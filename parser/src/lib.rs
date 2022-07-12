@@ -147,14 +147,14 @@ impl parser::Parser for Parser {
                         }
                     }
                 }
-                Payload::InstanceSection(mut reader) => {
-                    for _ in 0..reader.get_count() {
-                        output.core_instances.push(reader.read()?.into())
+                Payload::InstanceSection(reader) => {
+                    for instance in reader {
+                        output.core_instances.push(instance?.into())
                     }
                 }
-                Payload::AliasSection(mut reader) => {
-                    for _ in 0..reader.get_count() {
-                        match reader.read()? {
+                Payload::AliasSection(reader) => {
+                    for alias in reader {
+                        match alias? {
                             Alias::InstanceExport {
                                 kind,
                                 instance_index,
@@ -182,9 +182,9 @@ impl parser::Parser for Parser {
                 Payload::ComponentAliasSection(_) => todo!("component alias sections"),
                 Payload::ComponentCanonicalSection(_) => todo!("component canonical sections"),
                 Payload::ComponentStartSection(_) => todo!("component start sections"),
-                Payload::ComponentImportSection(mut reader) => {
-                    for _ in 0..reader.get_count() {
-                        let import = reader.read()?;
+                Payload::ComponentImportSection(reader) => {
+                    for import in reader {
+                        let import = import?;
                         match import.ty {
                             wasmparser::ComponentTypeRef::Module(_) => output
                                 .modules
@@ -199,9 +199,9 @@ impl parser::Parser for Parser {
                         }
                     }
                 }
-                Payload::ComponentExportSection(mut reader) => {
-                    for _ in 0..reader.get_count() {
-                        output.exports.push(reader.read()?.into())
+                Payload::ComponentExportSection(reader) => {
+                    for export in reader {
+                        output.exports.push(export?.into())
                     }
                 }
 
