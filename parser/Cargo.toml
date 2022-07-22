@@ -8,7 +8,7 @@ publish = false
 crate-type = ["cdylib"]
 
 [dependencies]
-wasmparser = "0.87.0"
+wasmparser = { git = "https://github.com/Liamolucko/wasm-tools", branch = "validator-types" }
 
 [dependencies.wit-bindgen-rust]
 git = "https://github.com/bytecodealliance/wit-bindgen"

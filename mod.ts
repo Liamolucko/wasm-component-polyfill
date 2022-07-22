@@ -1,10 +1,20 @@
+import { lower } from "./lower/mod.ts";
 import {
+  AnnotatedValtype,
+  CanonOpts,
   CoreExport,
+  CoreFunc,
   CoreInstance,
   CoreSort,
   Export,
+  Func,
   parse,
+  ResolvedAnnotatedValtype,
+  ResolvedCanonOpts,
+  ResolvedFunc,
+  ResolvedValtype,
   Sort,
+  Valtype,
 } from "./parser/mod.ts";
 
 type CompiledModule = WebAssembly.Module | { import: string };
@@ -12,10 +22,11 @@ type CompiledModule = WebAssembly.Module | { import: string };
 export class Component {
   #modules: CompiledModule[];
   #coreInstances: CoreInstance[];
-  #coreFuncs: CoreExport[];
+  #coreFuncs: CoreFunc[];
   #tables: CoreExport[];
   #memories: CoreExport[];
   #globals: CoreExport[];
+  #funcs: ResolvedFunc[];
   #exports: Export[];
 
   constructor(data: BufferSource) {
@@ -44,6 +55,44 @@ export class Component {
     this.#tables = parsed.tables;
     this.#memories = parsed.memories;
     this.#globals = parsed.globals;
+
+    const resolveType = (ty: Valtype): ResolvedValtype => {
+      switch (ty.tag) {
+        case "idx":
+          return resolveType(parsed?.types[ty.val]);
+        case "primitive":
+          return ty;
+      }
+    };
+
+    function resolveAnnotatedType(
+      ty: AnnotatedValtype,
+    ): ResolvedAnnotatedValtype {
+      return {
+        offset: ty.offset,
+        ty: resolveType(ty.ty),
+      };
+    }
+
+    this.#funcs = parsed.funcs.map((func) => {
+      switch (func.tag) {
+        case "imported":
+          return func;
+        case "lifted":
+          return {
+            tag: "lifted",
+            val: {
+              ...func.val,
+              ty: {
+                ...func.val.ty,
+                params: func.val.ty.params.map(resolveAnnotatedType),
+                result: resolveAnnotatedType(func.val.ty.result),
+              },
+            },
+          };
+      }
+    });
+
     this.#exports = parsed.exports;
   }
 
@@ -61,32 +110,57 @@ export class Component {
             `Expected a module for import '${module.import}', found ${resolved}`,
           );
         }
+        // Ideally, we'd also validate that the module has the correct
+        // signature here.
+        // Unfortunately, I'm pretty sure that's impossible - modules don't
+        // give you the signatures of their imports and exports, and there's no
+        // way to get the raw bytes back out of them.
       }
     });
 
     // Then our core instances.
     const coreInstances: WebAssembly.Exports[] = [];
 
+    function resolveExport(desc: CoreExport): WebAssembly.ExportValue {
+      return coreInstances[desc.instance][desc.name];
+    }
+
+    // component functions
+    const funcs: Array<(...args: unknown[]) => unknown> = [];
+
+    const resolveCanonOpts = (opts: CanonOpts): ResolvedCanonOpts => {
+      return {
+        stringEncoding: opts.stringEncoding,
+        memory: opts.memory !== undefined
+          ? resolveExport(
+            this.#memories[opts.memory],
+          ) as WebAssembly.Memory
+          : undefined,
+      };
+    };
+
     const resolveCoreSort = (
       sort: CoreSort,
       index: number,
     ): WebAssembly.ExportValue => {
-      let desc: CoreExport;
       switch (sort) {
-        case "func":
-          desc = this.#coreFuncs[index];
+        case "func": {
+          const func = this.#coreFuncs[index];
+          switch (func.tag) {
+            case "aliased":
+              return resolveExport(func.val);
+            case "lowered":
+              return lower(funcs[func.val.func], func.val.ty, {});
+          }
           break;
+        }
         case "table":
-          desc = this.#tables[index];
-          break;
+          return resolveExport(this.#tables[index]);
         case "memory":
-          desc = this.#memories[index];
-          break;
+          return resolveExport(this.#memories[index]);
         case "global":
-          desc = this.#globals[index];
-          break;
+          return resolveExport(this.#globals[index]);
       }
-      return coreInstances[desc.instance][desc.name];
     };
 
     this.#coreInstances.forEach(({ tag, val }) => {

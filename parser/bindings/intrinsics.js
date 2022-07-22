@@ -6,3 +6,7 @@ export function data_view(mem) {
   return DATA_VIEW;
 }
 export const UTF8_DECODER = new TextDecoder('utf-8');
+
+export function throw_invalid_bool() {
+  throw new RangeError("invalid variant discriminant for bool");
+}

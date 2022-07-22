@@ -1,0 +1,111 @@
+/// Types for describing the signature of core modules.
+/// I've split these out because the JavaScript doesn't care about them at all,
+/// they're just meant to be passed around by the parser.
+/// I would have made them resources except that they need to be able to be
+/// sent between threads.
+
+/// A module type, which describes the requirements for a module's imports and
+/// exports.
+record module-type {
+    /// The imports that a module conforming to this type may have.
+    imports: list<core-import>,
+    /// The exports that a module conforming to this type must have.
+    export: list<core-export-decl>,
+}
+
+/// An import of a core module.
+record core-import {
+    /// The module from which the value is being imported.
+    module: string,
+    /// The name of the import.
+    name: string,
+    /// The type of the import.
+    ty: core-extern-type,
+}
+
+/// An export that is required of a core module.
+record core-export-decl {
+    /// The name of the export.
+    name: string,
+    /// The type of the export.
+    ty: core-extern-type,
+}
+
+/// A core WebAssembly 'external type' (https://webassembly.github.io/spec/core/syntax/types.html#external-types).
+/// Basically, the type of a module import or export.
+variant core-extern-type {
+    /// A function with the contained type.
+    %func(core-func-type),
+    /// A table with the contained type.
+    table(table-type),
+    /// A memory with the contained type.
+    memory(memory-type),
+    /// A global with the contained type.
+    global(global-type),
+}
+
+/// The type of a core function.
+record core-func-type {
+    /// The parameters of the function.
+    params: list<core-valtype>,
+    /// The results of the function.
+    results: list<core-valtype>,
+}
+
+/// The type of a value in core WebAssembly.
+enum core-valtype {
+    i32,
+    i64,
+    f32,
+    f64,
+    v128,
+    funcref,
+    externref,
+}
+
+/// The type of a table.
+record table-type {
+    /// The type that this table stores.
+    ty: reftype,
+    /// The limits on the size of this table.
+    limits: limits,
+}
+
+/// A reference type, which can be stored in a table.
+enum reftype {
+    funcref,
+    externref,
+}
+
+/// Limits on the size of a table or memory.
+record limits {
+    /// The minimum size of the object.
+    min: u32,
+    /// The maximum size of the object, or `none` if its size is unlimited.
+    max: option<u32>,
+}
+
+/// The type of a memory.
+record memory-type {
+    /// The limits on the size of the memory.
+    limits: limits,
+    // This isn't supported in components yet anyway so I won't bother with it.
+    // /// Whether or not the memory is shared.
+    // shared: bool,
+}
+
+/// The type of a global.
+record global-type {
+    /// The type stored in the global.
+    ty: core-valtype,
+    /// The mutability of the global.
+    mut: mut,
+}
+
+/// The mutability of a global.
+enum mut {
+    /// The global is immutable.
+    const,
+    /// The global is mutable.
+    var,
+}

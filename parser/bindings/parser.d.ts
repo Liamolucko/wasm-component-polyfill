@@ -17,17 +17,17 @@ export interface Error {
 */
 export interface Component {
   /**
-  * The core modules in the component.
+  * All of the core modules available in the component.
   */
   modules: Module[],
   /**
-  * The core instances in the component.
+  * All of the core instances available in the component.
   */
   coreInstances: CoreInstance[],
   /**
-  * All of the core functions that we've aliased.
+  * All of the core functions available in the component.
   */
-  coreFuncs: CoreExport[],
+  coreFuncs: CoreFunc[],
   /**
   * All of the core tables that we've aliased.
   */
@@ -37,9 +37,17 @@ export interface Component {
   */
   memories: CoreExport[],
   /**
-  * All of the core gloabls that we've aliased.
+  * All of the core globals that we've aliased.
   */
   globals: CoreExport[],
+  /**
+  * Storage for nested types.
+  */
+  types: Deftype[],
+  /**
+  * All of the functions available in the component.
+  */
+  funcs: Func[],
   /**
   * The exports of the component.
   */
@@ -153,6 +161,232 @@ export interface CoreReexport {
 * A global.
 */
 export type CoreSort = "func" | "table" | "memory" | "global";
+export type CoreFunc = CoreFuncAliased | CoreFuncLowered;
+/**
+* A core function aliased from a module.
+*/
+export interface CoreFuncAliased {
+  tag: "aliased",
+  val: CoreExport,
+}
+/**
+* A core function lowered from a component function.
+*/
+export interface CoreFuncLowered {
+  tag: "lowered",
+  val: LoweredFunc,
+}
+/**
+* A core function lowered from a component function.
+*/
+export interface LoweredFunc {
+  /**
+  * The index of the component function this is lowered from.
+  */
+  func: number,
+  /**
+  * The type of the function we're lowering from.
+  */
+  ty: FuncType,
+  /**
+  * The options specified for how to lower this function.
+  */
+  options: CanonOpts,
+}
+/**
+* The type of a component function.
+* 
+* This also contains extra annotations about how the function should be
+* lifted/lowered.
+*/
+export interface FuncType {
+  /**
+  * The parameters of the function.
+  */
+  params: AnnotatedValtype[],
+  /**
+  * The result of the function.
+  */
+  result: AnnotatedValtype,
+  /**
+  * Whether the arguments will be passed as core WebAssembly arguments
+  * rather than on the stack.
+  */
+  flatParams: boolean,
+  /**
+  * Whether the result will be passed as core WebAssembly results rather
+  * than on the stack.
+  */
+  flatResult: boolean,
+}
+/**
+* A primitive value type.
+* 
+* # Variants
+* 
+* ## `"unit"`
+* 
+* The unit type.
+* 
+* ## `"bool"`
+* 
+* A boolean.
+* 
+* ## `"s8"`
+* 
+* An 8-bit signed integer.
+* 
+* ## `"u8"`
+* 
+* An 8-bit unsigned integer.
+* 
+* ## `"s16"`
+* 
+* A 16-bit signed integer.
+* 
+* ## `"u16"`
+* 
+* A 16-bit unsigned integer.
+* 
+* ## `"s32"`
+* 
+* A 32-bit signed integer.
+* 
+* ## `"u32"`
+* 
+* A 32-bit unsigned integer.
+* 
+* ## `"s64"`
+* 
+* A 64-bit signed integer.
+* 
+* ## `"u64"`
+* 
+* A 64-bit unsigned integer.
+* 
+* ## `"float32"`
+* 
+* A 32-bit floating point number.
+* 
+* ## `"float64"`
+* 
+* A 64-bit floating point number.
+* 
+* ## `"char"`
+* 
+* A Unicode character (more specifically, a Unicode Scalar Value).
+* 
+* ## `"string"`
+* 
+* A string.
+*/
+export type Primtype = "unit" | "bool" | "s8" | "u8" | "s16" | "u16" | "s32" | "u32" | "s64" | "u64" | "float32" | "float64" | "char" | "string";
+/**
+* The type of a value.
+*/
+export type Valtype = ValtypeIdx | ValtypePrimitive;
+/**
+* The type at the contained index.
+* 
+* Note that this index can be an index into one of two places - if this
+* is contained in an `annotated-valtype`, it's an index into the
+* `annotated-types` field of `component`, otherwise it's an index into
+* the `types` field.
+*/
+export interface ValtypeIdx {
+  tag: "idx",
+  val: number,
+}
+/**
+* A primitive type.
+*/
+export interface ValtypePrimitive {
+  tag: "primitive",
+  val: Primtype,
+}
+/**
+* A user-defined type.
+*/
+export type Deftype = DeftypePrimitive;
+/**
+* A primitive type.
+*/
+export interface DeftypePrimitive {
+  tag: "primitive",
+  val: Primtype,
+}
+/**
+* The type of a value, annotated with info on how it should be lifted/lowered.
+*/
+export interface AnnotatedValtype {
+  /**
+  * The offset at which this type should be lowered/lifted.
+  * 
+  * If using flat params/results, this is the index of the first param/result
+  * that is part of this type.
+  * 
+  * If lowering/lifting using the stack, this is the offset in memory of
+  * the type.
+  */
+  offset: number,
+  /**
+  * The inner type.
+  */
+  ty: Valtype,
+}
+/**
+* A user-defined type, annotated with info on how it should be lifted/lowered.
+*/
+export interface AnnotatedDeftype {
+  /**
+  * The offset at which this type should be lowered/lifted.
+  * 
+  * If using flat params/results, this is the index of the first param/result
+  * that is part of this type.
+  * 
+  * If lowering/lifting using the stack, this is the offset in memory of
+  * the type.
+  */
+  offset: number,
+  /**
+  * The inner type.
+  */
+  ty: Deftype,
+}
+/**
+* # Variants
+* 
+* ## `"utf8"`
+* 
+* ## `"utf16"`
+* 
+* ## `"latin1-or-utf16"`
+*/
+export type StringEncoding = "utf8" | "utf16" | "latin1-or-utf16";
+/**
+* Options passed to a `canon lower` / `canon lift` operation.
+*/
+export interface CanonOpts {
+  /**
+  * The encoding that the function to be lifted uses for strings.
+  */
+  stringEncoding: StringEncoding,
+  /**
+  * The index of the memory that should be used to load and store values.
+  */
+  memory?: number,
+  /**
+  * The index of the `realloc` function to be used to allocate space for
+  * values.
+  */
+  realloc?: number,
+  /**
+  * The index of the `post-return` function, which should be called after
+  * the core function has returned and its results have been lifted, with
+  * the results of the core function as its parameters.
+  */
+  postReturn?: number,
+}
 /**
 * An export of a core instance.
 */
@@ -165,6 +399,41 @@ export interface CoreExport {
   * The name of the export.
   */
   name: string,
+}
+/**
+* A component function.
+*/
+export type Func = FuncImported | FuncLifted;
+/**
+* A component function imported with the contained name.
+*/
+export interface FuncImported {
+  tag: "imported",
+  val: string,
+}
+/**
+* A component function lifted from a core function.
+*/
+export interface FuncLifted {
+  tag: "lifted",
+  val: LiftedFunc,
+}
+/**
+* A component function lifted from a core function.
+*/
+export interface LiftedFunc {
+  /**
+  * The index of the core function this is lifted from.
+  */
+  coreFunc: number,
+  /**
+  * The type of the function.
+  */
+  ty: FuncType,
+  /**
+  * The options specified for how to lift this function.
+  */
+  options: CanonOpts,
 }
 /**
 * A component export.
@@ -191,8 +460,12 @@ export interface Export {
 * ## `"module"`
 * 
 * A core module.
+* 
+* ## `"func"`
+* 
+* A function.
 */
-export type Sort = "module";
+export type Sort = "module" | "func";
 export class Parser {
   
   /**

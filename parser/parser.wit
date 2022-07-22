@@ -29,18 +29,22 @@ record parse-error {
 
 /// A WebAssembly component.
 record component {
-    /// The core modules in the component.
+    /// All of the core modules available in the component.
     modules: list<module>,
-    /// The core instances in the component.
+    /// All of the core instances available in the component.
     core-instances: list<core-instance>,
-    /// All of the core functions that we've aliased.
-    core-funcs: list<core-export>,
+    /// All of the core functions available in the component.
+    core-funcs: list<core-func>,
     /// All of the core tables that we've aliased.
     tables: list<core-export>,
     /// All of the core memories that we've aliased.
     memories: list<core-export>,
-    /// All of the core gloabls that we've aliased.
+    /// All of the core globals that we've aliased.
     globals: list<core-export>,
+    /// Storage for nested types.
+    types: list<deftype>,
+    /// All of the functions available in the component.
+    funcs: list<%func>,
     /// The exports of the component.
     exports: list<export>,
 }
@@ -111,12 +115,174 @@ enum core-sort {
     // instance,
 }
 
+variant core-func {
+    /// A core function aliased from a module.
+    aliased(core-export),
+    /// A core function lowered from a component function.
+    lowered(lowered-func),
+}
+
+/// A core function lowered from a component function.
+record lowered-func {
+    /// The index of the component function this is lowered from.
+    %func: u32,
+    /// The type of the function we're lowering from.
+    ty: func-type,
+    /// The options specified for how to lower this function.
+    options: canon-opts,
+}
+
+/// The type of a component function.
+///
+/// This also contains extra annotations about how the function should be
+/// lifted/lowered.
+record func-type {
+    /// The parameters of the function.
+    params: list<annotated-valtype>,
+    /// The result of the function.
+    result: annotated-valtype,
+    /// Whether the arguments will be passed as core WebAssembly arguments
+    /// rather than on the stack.
+    flat-params: bool,
+    /// Whether the result will be passed as core WebAssembly results rather
+    /// than on the stack.
+    flat-result: bool,
+}
+
+/// A primitive value type.
+enum primtype {
+    /// The unit type.
+    %unit,
+    /// A boolean.
+    %bool,
+    /// An 8-bit signed integer.
+    %s8,
+    /// An 8-bit unsigned integer.
+    %u8,
+    /// A 16-bit signed integer.
+    %s16,
+    /// A 16-bit unsigned integer.
+    %u16,
+    /// A 32-bit signed integer.
+    %s32,
+    /// A 32-bit unsigned integer.
+    %u32,
+    /// A 64-bit signed integer.
+    %s64,
+    /// A 64-bit unsigned integer.
+    %u64,
+    /// A 32-bit floating point number.
+    %float32,
+    /// A 64-bit floating point number.
+    %float64,
+    /// A Unicode character (more specifically, a Unicode Scalar Value).
+    %char,
+    /// A string.
+    %string,
+}
+
+/// The type of a value.
+variant valtype {
+    /// The type at the contained index.
+    ///
+    /// Note that this index can be an index into one of two places - if this
+    /// is contained in an `annotated-valtype`, it's an index into the
+    /// `annotated-types` field of `component`, otherwise it's an index into
+    /// the `types` field.
+    idx(u32),
+    /// A primitive type.
+    primitive(primtype),
+}
+
+/// A user-defined type.
+variant deftype {
+    /// A primitive type.
+    primitive(primtype),
+    // record,
+    // variant,
+    // list,
+    // tuple,
+    // flags,
+    // enum,
+    // union,
+    // option,
+    // expected,
+}
+
+/// The type of a value, annotated with info on how it should be lifted/lowered.
+record annotated-valtype {
+    /// The offset at which this type should be lowered/lifted.
+    ///
+    /// If using flat params/results, this is the index of the first param/result
+    /// that is part of this type.
+    ///
+    /// If lowering/lifting using the stack, this is the offset in memory of
+    /// the type.
+    offset: u32,
+    /// The inner type.
+    ty: valtype,
+}
+
+/// A user-defined type, annotated with info on how it should be lifted/lowered.
+record annotated-deftype {
+    /// The offset at which this type should be lowered/lifted.
+    ///
+    /// If using flat params/results, this is the index of the first param/result
+    /// that is part of this type.
+    ///
+    /// If lowering/lifting using the stack, this is the offset in memory of
+    /// the type.
+    offset: u32,
+    /// The inner type.
+    ty: deftype,
+}
+
+enum string-encoding {
+    utf8,
+    utf16,
+    latin1-or-utf16
+}
+
+/// Options passed to a `canon lower` / `canon lift` operation.
+record canon-opts {
+    /// The encoding that the function to be lifted uses for strings.
+    string-encoding: string-encoding,
+    /// The index of the memory that should be used to load and store values.
+    memory: option<u32>,
+    /// The index of the `realloc` function to be used to allocate space for
+    /// values.
+    realloc: option<u32>,
+    /// The index of the `post-return` function, which should be called after
+    /// the core function has returned and its results have been lifted, with
+    /// the results of the core function as its parameters.
+    post-return: option<u32>,
+}
+
 /// An export of a core instance.
 record core-export {
     /// The index of the instance it's an export of.
     instance: u32,
     /// The name of the export.
     name: string,
+}
+
+/// A component function.
+variant %func {
+    /// A component function imported with the contained name.
+    imported(string),
+    /// A component function lifted from a core function.
+    lifted(lifted-func),
+    // in future there'll be another variant for aliased functions
+}
+
+/// A component function lifted from a core function.
+record lifted-func {
+    /// The index of the core function this is lifted from.
+    core-func: u32,
+    /// The type of the function.
+    ty: func-type,
+    /// The options specified for how to lift this function.
+    options: canon-opts,
 }
 
 /// A component export.
@@ -134,7 +300,7 @@ enum sort {
     /// A core module.
     module,
     /// A function.
-    // %func,
+    %func,
     // value,
     // type,
     // component,
@@ -164,38 +330,4 @@ enum sort {
 //     // type,
 //     // instance,
 //     // component,
-// }
-
-/// The type of a value.
-// variant valtype {
-//     /// The type at the contained index.
-//     idx(u32),
-//     /// The unit type.
-//     %unit,
-//     /// A boolean.
-//     %bool,
-//     /// An 8-bit signed integer.
-//     %s8,
-//     /// An 8-bit unsigned integer.
-//     %u8,
-//     /// A 16-bit signed integer.
-//     %s16,
-//     /// A 16-bit unsigned integer.
-//     %u16,
-//     /// A 32-bit signed integer.
-//     %s32,
-//     /// A 32-bit unsigned integer.
-//     %u32,
-//     /// A 64-bit signed integer.
-//     %s64,
-//     /// A 64-bit unsigned integer.
-//     %u64,
-//     /// A 32-bit floating point number.
-//     %float32,
-//     /// A 64-bit floating point number.
-//     %float64,
-//     /// A Unicode character (more specifically, a Unicode Scalar Value).
-//     %char,
-//     /// A string.
-//     %string,
 // }
