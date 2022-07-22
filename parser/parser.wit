@@ -1,10 +1,25 @@
 // TODO: incremental parsing
 
-/// Parses the passed bytes into a WebAssembly component, or returns `none` if the input is a module.
-parse: func(data: list<u8>) -> expected<option<component>, error>
+/// A parser midway through parsing.
+resource parser {
+    /// Create an instance of the parser.
+    new: func() -> parser
+    /// Feeds a chunk of data into the parser and returns a list of definitions from that chunk.
+    ///
+    /// Returning `none` indicates the end of the component.
+    feed: func(data: list<u8>) -> expected<option<list<definition>>, error>
+}
 
 /// An error returned from the parser.
-record error {
+variant error {
+    /// The component was invalid.
+    parse-error(parse-error),
+    /// The passed data was a wasm module, not a component.
+    not-a-component,
+}
+
+/// An error which occurs as a result of an invalid component.
+record parse-error {
     /// The error's message.
     message: string,
     /// The offset in the wasm binary where the error occurred.
